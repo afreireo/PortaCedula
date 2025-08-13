@@ -276,7 +276,10 @@ fun Rotating3DCard(
         val front = frontDataUrl ?: placeholderSvgBase64("Anverso")
         val back  = backDataUrl  ?: placeholderSvgBase64("Reverso")
 
-        // Importante: script apunta a assets (r160) y tenemos logs en consola
+        // MISMO HTML QUE TE FUNCIONABA, con 3 cambios:
+        // - cámara más cerca + FOV 30 (más grande)
+        // - alphaMap con esquinas redondeadas en las caras
+        // - velocidad mitad (0.005)
         """
         <!doctype html>
         <html>
@@ -302,7 +305,6 @@ fun Rotating3DCard(
           <div id="root"></div>
           <script>
             try {
-              // Verificar WebGL
               function webglAvailable() {
                 try {
                   const c = document.createElement('canvas');
@@ -317,8 +319,9 @@ fun Rotating3DCard(
                 document.body.appendChild(msg);
               } else {
                 const scene = new THREE.Scene();
-                const camera = new THREE.PerspectiveCamera(35, window.innerWidth/window.innerHeight, 0.1, 100);
-                camera.position.set(0,0,4);
+                // ⬇️ más grande: FOV más bajo y cámara más cerca
+                const camera = new THREE.PerspectiveCamera(30, window.innerWidth/window.innerHeight, 0.1, 100);
+                camera.position.set(0,0,2.8);
 
                 const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
                 renderer.setClearColor(0x000000, 0);
@@ -331,11 +334,42 @@ fun Rotating3DCard(
                 scene.add(dir);
                 scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
+                // --- AlphaMap redondeado para las caras ---
+                // Creamos un canvas con rectángulo redondeado blanco sobre fondo transparente
+                function makeRoundedAlpha(aspect, px=1024) {
+                  const w = px;
+                  const h = Math.max(1, Math.round(px / aspect)); // mantiene 1.586
+                  const r = Math.round(h * 0.08);                  // radio ~8% del alto
+                  const c = document.createElement('canvas');
+                  c.width = w; c.height = h;
+                  const g = c.getContext('2d');
+                  g.clearRect(0,0,w,h);
+                  g.fillStyle = 'white';
+                  const x=0,y=0;
+                  g.beginPath();
+                  g.moveTo(x+r, y);
+                  g.lineTo(x+w-r, y);
+                  g.quadraticCurveTo(x+w, y, x+w, y+r);
+                  g.lineTo(x+w, y+h-r);
+                  g.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+                  g.lineTo(x+r, y+h);
+                  g.quadraticCurveTo(x, y+h, x, y+h-r);
+                  g.lineTo(x, y+r);
+                  g.quadraticCurveTo(x, y, x+r, y);
+                  g.closePath();
+                  g.fill();
+                  const tex = new THREE.CanvasTexture(c);
+                  if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding; else tex.colorSpace = THREE.SRGBColorSpace;
+                  tex.needsUpdate = true;
+                  return tex;
+                }
+                const aspect = $ID_CARD_ASPECT; // 1.586
+                const alphaTex = makeRoundedAlpha(aspect);
+
                 // Texturas (data URLs)
                 const loader = new THREE.TextureLoader();
                 const frontTex = loader.load("$front", () => console.log('front loaded'), undefined, (e)=>console.error('front err', e));
                 const backTex  = loader.load("$back",  () => console.log('back loaded'),  undefined, (e)=>console.error('back err', e));
-
                 if (THREE.sRGBEncoding) {
                   frontTex.encoding = THREE.sRGBEncoding;
                   backTex.encoding  = THREE.sRGBEncoding;
@@ -343,25 +377,28 @@ fun Rotating3DCard(
                   frontTex.colorSpace = THREE.SRGBColorSpace;
                   backTex.colorSpace  = THREE.SRGBColorSpace;
                 }
+                frontTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+                backTex.anisotropy  = renderer.capabilities.getMaxAnisotropy();
 
-                // Geometría tarjeta
-                const aspect = $ID_CARD_ASPECT;
+                // Geometría tarjeta (caja muy delgada)
                 const w = aspect, h = 1, d = 0.02;
+                // ⬇️ materiales: lados grises; caras con alphaMap (esquinas redondas)
                 const mats = [
-                  new THREE.MeshPhongMaterial({color:0x888888}),
-                  new THREE.MeshPhongMaterial({color:0x888888}),
-                  new THREE.MeshPhongMaterial({color:0x888888}),
-                  new THREE.MeshPhongMaterial({color:0x888888}),
-                  new THREE.MeshBasicMaterial({map: frontTex}),
-                  new THREE.MeshBasicMaterial({map: backTex})
+                  new THREE.MeshPhongMaterial({color:0x888888}), // lado -X
+                  new THREE.MeshPhongMaterial({color:0x888888}), // lado +X
+                  new THREE.MeshPhongMaterial({color:0x888888}), // lado -Y
+                  new THREE.MeshPhongMaterial({color:0x888888}), // lado +Y
+                  new THREE.MeshBasicMaterial({map: frontTex, alphaMap: alphaTex, transparent:true}),
+                  new THREE.MeshBasicMaterial({map: backTex,  alphaMap: alphaTex, transparent:true})
                 ];
                 const geom = new THREE.BoxGeometry(w,h,d);
                 const card = new THREE.Mesh(geom, mats);
                 scene.add(card);
 
+                // ⬇️ Animación (mitad de velocidad)
                 function animate() {
                   requestAnimationFrame(animate);
-                  card.rotation.y += 0.01;
+                  card.rotation.y += 0.005;
                   renderer.render(scene, camera);
                 }
                 animate();
@@ -389,7 +426,6 @@ fun Rotating3DCard(
         modifier = modifier,
         factory = { ctx ->
             WebView(ctx).apply {
-                // Debug útil: mira Logcat (WebView)
                 WebView.setWebContentsDebuggingEnabled(true)
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 settings.javaScriptEnabled = true
@@ -398,9 +434,7 @@ fun Rotating3DCard(
                 settings.allowFileAccessFromFileURLs = true
                 settings.allowUniversalAccessFromFileURLs = true
                 settings.cacheMode = WebSettings.LOAD_NO_CACHE
-                // fuerza aceleración HW (por si el Activity la tiene off)
                 setLayerType(View.LAYER_TYPE_HARDWARE, null)
-
                 webViewClient = WebViewClient()
                 webChromeClient = object : WebChromeClient() {
                     override fun onConsoleMessage(cm: ConsoleMessage): Boolean {
@@ -411,7 +445,6 @@ fun Rotating3DCard(
             }
         },
         update = { webView ->
-            // Base en assets para que <script src="three/three.min.js"> funcione OFFLINE
             webView.loadDataWithBaseURL(
                 "file:///android_asset/",
                 html,
