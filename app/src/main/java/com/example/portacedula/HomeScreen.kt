@@ -46,10 +46,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import android.view.View
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.window.DialogProperties
 
 
 // Proporción real de una cédula/tarjeta (ISO/IEC 7810 ID‑1: 85.60 × 53.98 mm)
@@ -213,27 +219,13 @@ fun HomeScreen(vm: HomeViewModel) {
         }
     }
 
-    // Zoom de imagen
     if (ui.showZoom != null) {
-        Dialog(onDismissRequest = { vm.onZoom(null) }) {
-            Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 2.dp) {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(ID_CARD_ASPECT)
-                        .clickable { vm.onZoom(null) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    AsyncImage(
-                        model = ui.showZoom,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-            }
-        }
+        FullscreenImageViewer(
+            uri = ui.showZoom!!,
+            onClose = { vm.onZoom(null) }
+        )
     }
+
 }
 
 
@@ -519,6 +511,80 @@ fun IdCardSection(
                 )
             } else {
                 Text("Agregar", color = Color.Gray)
+            }
+        }
+    }
+}
+
+@Composable
+fun FullscreenImageViewer(
+    uri: String,
+    onClose: () -> Unit
+) {
+    // Estado de zoom/traslación
+    var scale by remember { mutableStateOf(1f) }
+    var offsetX by remember { mutableStateOf(0f) }
+    var offsetY by remember { mutableStateOf(0f) }
+
+    val transformState = rememberTransformableState { zoomChange, panChange, _ ->
+        val newScale = (scale * zoomChange).coerceIn(1f, 5f)
+        // Ajustar pan proporcional al zoom
+        if (newScale > 1f) {
+            offsetX += panChange.x
+            offsetY += panChange.y
+        } else {
+            offsetX = 0f; offsetY = 0f
+        }
+        scale = newScale
+    }
+
+    BackHandler(onBack = onClose)
+
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,   // ⬅️ ocupa toda la pantalla
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            // Imagen (fit, con zoom/drag)
+            AsyncImage(
+                model = uri,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,     // muestra completa (tipo “viewer”)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = offsetX
+                        translationY = offsetY
+                    }
+                    .transformable(transformState)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = {
+                                // doble toque: reset
+                                scale = 1f; offsetX = 0f; offsetY = 0f
+                            },
+                            onTap = { /* si quieres, alterna UI */ }
+                        )
+                    }
+            )
+
+            // Botón cerrar (arriba-izquierda)
+            FilledTonalIconButton(
+                onClick = onClose,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+            ) {
+                Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
             }
         }
     }
