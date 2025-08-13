@@ -119,7 +119,7 @@ fun HomeScreen(vm: HomeViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Porta Cedula") }, // alineado a la izquierda por defecto
+                title = { Text("Porta Cédula") }, // alineado a la izquierda por defecto
                 colors = TopAppBarDefaults.topAppBarColors()
             )
         },
@@ -152,9 +152,9 @@ fun HomeScreen(vm: HomeViewModel) {
             // Anverso reducido (90% del ancho)
             item {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Column(Modifier.fillMaxWidth(0.85f)) {
+                    Column(Modifier.fillMaxWidth(0.80f)) {
                         IdCardSection(
-                            title = "Parte anverso",
+                            title = "Parte Frontal",
                             uri = ui.frontUri,
                             onAdd = { launchDocScanner { uri -> vm.onFrontCaptured(uri.toString()) } },
                             onOpen = { ui.frontUri?.let(vm::onZoom) }
@@ -166,9 +166,9 @@ fun HomeScreen(vm: HomeViewModel) {
             // Reverso reducido (90% del ancho)
             item {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Column(Modifier.fillMaxWidth(0.85f)) {
+                    Column(Modifier.fillMaxWidth(0.80f)) {
                         IdCardSection(
-                            title = "Parte reverso",
+                            title = "Parte Reversa",
                             uri = ui.backUri,
                             onAdd = { launchDocScanner { uri -> vm.onBackCaptured(uri.toString()) } },
                             onOpen = { ui.backUri?.let(vm::onZoom) }
@@ -177,7 +177,7 @@ fun HomeScreen(vm: HomeViewModel) {
                 }
             }
 
-            item { Spacer(Modifier.height(24.dp)) }
+            //item { Spacer(Modifier.height(24.dp)) }
         }
     }
 
@@ -191,14 +191,6 @@ fun HomeScreen(vm: HomeViewModel) {
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Rotating3DCard(
-                    frontUri = ui.frontUri,
-                    backUri  = ui.backUri,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(ID_CARD_ASPECT)
-                )
-
                 Text("Agregar", style = MaterialTheme.typography.titleMedium)
                 ListItem(
                     headlineContent = { Text("Agregar anverso") },
