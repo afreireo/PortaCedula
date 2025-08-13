@@ -55,6 +55,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.DialogProperties
 
 
@@ -124,7 +125,10 @@ fun HomeScreen(vm: HomeViewModel) {
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { vm.toggleAddSheet(true) }) {
+            FloatingActionButton(onClick = { vm.toggleAddSheet(true) },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary )
+            {
                 Icon(Icons.Default.Edit, contentDescription = "Editar")
             }
         }
@@ -152,7 +156,7 @@ fun HomeScreen(vm: HomeViewModel) {
             // Anverso reducido (90% del ancho)
             item {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Column(Modifier.fillMaxWidth(0.80f)) {
+                    Column(Modifier.fillMaxWidth(0.84f)) {
                         IdCardSection(
                             title = "Parte Frontal",
                             uri = ui.frontUri,
@@ -166,7 +170,7 @@ fun HomeScreen(vm: HomeViewModel) {
             // Reverso reducido (90% del ancho)
             item {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Column(Modifier.fillMaxWidth(0.80f)) {
+                    Column(Modifier.fillMaxWidth(0.84f)) {
                         IdCardSection(
                             title = "Parte Reversa",
                             uri = ui.backUri,
