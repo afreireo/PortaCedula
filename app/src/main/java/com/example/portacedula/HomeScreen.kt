@@ -26,6 +26,9 @@ import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 
+// Proporción real de una cédula/tarjeta (ISO/IEC 7810 ID‑1: 85.60 × 53.98 mm)
+private const val ID_CARD_ASPECT = 1.586f
+
 // ---------- extensión para obtener Activity ----------
 fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
@@ -59,12 +62,11 @@ fun HomeScreen(vm: HomeViewModel) {
             Toast.makeText(context, "No se encontró Activity", Toast.LENGTH_SHORT).show()
             return
         }
-
         val opts = GmsDocumentScannerOptions.Builder()
             .setGalleryImportAllowed(false)
             .setPageLimit(1)
             .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
-            .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_BASE) // con cuadro guía
+            .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_BASE) // UI con cuadro/guía
             .build()
 
         val scanner = GmsDocumentScanning.getClient(opts)
@@ -82,7 +84,7 @@ fun HomeScreen(vm: HomeViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Porta Cedula") }, // por defecto alineado izquierda
+                title = { Text("Porta Cedula") }, // alineado a la izquierda por defecto
                 colors = TopAppBarDefaults.topAppBarColors()
             )
         },
@@ -143,18 +145,24 @@ fun HomeScreen(vm: HomeViewModel) {
         }
     }
 
-    // Zoom de imagen
+    // Zoom de imagen (opción A: llena contenedor de tarjeta, recorta bordes con Crop)
     if (ui.showZoom != null) {
         Dialog(onDismissRequest = { vm.onZoom(null) }) {
             Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 2.dp) {
-                AsyncImage(
-                    model = ui.showZoom,
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
+                Box(
+                    Modifier
                         .fillMaxWidth()
-                        .clickable { vm.onZoom(null) }
-                )
+                        .aspectRatio(ID_CARD_ASPECT) // mantiene proporción de tarjeta en el zoom
+                        .clickable { vm.onZoom(null) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    AsyncImage(
+                        model = ui.showZoom,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop, // ← recorta bordes extra del escáner
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
     }
@@ -169,10 +177,11 @@ private fun IdCardSection(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(title, style = MaterialTheme.typography.titleMedium)
+
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(180.dp)
+                .aspectRatio(ID_CARD_ASPECT) // ← formato ID‑1 exacto
                 .clickable { if (uri != null) onOpen() else onAdd() },
             shape = RoundedCornerShape(16.dp),
             tonalElevation = 2.dp
@@ -184,7 +193,7 @@ private fun IdCardSection(
                     AsyncImage(
                         model = uri,
                         contentDescription = title,
-                        contentScale = ContentScale.Crop,
+                        contentScale = ContentScale.Crop, // ← ajusta, recortando bordes si sobran
                         modifier = Modifier.fillMaxSize()
                     )
                 }
