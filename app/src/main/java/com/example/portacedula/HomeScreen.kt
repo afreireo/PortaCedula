@@ -245,6 +245,7 @@ private fun IdCardSection(
 
 
 
+
 @Composable
 fun Rotating3DCard(
     frontUri: String?,
@@ -253,7 +254,6 @@ fun Rotating3DCard(
 ) {
     val context = LocalContext.current
 
-    // Convierte las URIs a data URL base64 para que el WebView las pueda cargar offline
     var frontDataUrl by remember { mutableStateOf<String?>(null) }
     var backDataUrl  by remember { mutableStateOf<String?>(null) }
 
@@ -275,11 +275,6 @@ fun Rotating3DCard(
     val html = remember(frontDataUrl, backDataUrl) {
         val front = frontDataUrl ?: placeholderSvgBase64("Anverso")
         val back  = backDataUrl  ?: placeholderSvgBase64("Reverso")
-
-        // MISMO HTML QUE TE FUNCIONABA, con 3 cambios:
-        // - cámara más cerca + FOV 30 (más grande)
-        // - alphaMap con esquinas redondeadas en las caras
-        // - velocidad mitad (0.005)
         """
         <!doctype html>
         <html>
@@ -291,131 +286,167 @@ fun Rotating3DCard(
             #root { position:fixed; inset:0; }
             canvas { width:100%; height:100%; display:block; }
           </style>
-          <script>
-            // logger simple
-            (function(){
-              const oldLog = console.log, oldErr = console.error;
-              console.log = function(){ oldLog.apply(console, arguments); };
-              console.error = function(){ oldErr.apply(console, arguments); };
-            })();
-          </script>
           <script src="three/three.min.js"></script>
         </head>
         <body>
           <div id="root"></div>
           <script>
-            try {
-              function webglAvailable() {
-                try {
-                  const c = document.createElement('canvas');
-                  return !!(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl')));
-                } catch (e) { return false; }
-              }
-              if (!webglAvailable()) {
-                document.body.style.background = 'transparent';
-                const msg = document.createElement('div');
-                msg.style.cssText='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#888;font-family:sans-serif';
-                msg.textContent = 'WebGL no disponible';
-                document.body.appendChild(msg);
-              } else {
-                const scene = new THREE.Scene();
-                // ⬇️ más grande: FOV más bajo y cámara más cerca
-                const camera = new THREE.PerspectiveCamera(30, window.innerWidth/window.innerHeight, 0.1, 100);
-                camera.position.set(0,0,2.8);
+            // -------- Config --------
+            const aspect = $ID_CARD_ASPECT;   // 1.586
+            const w = aspect, h = 1.0;
+            const d = 0.05;                   // grosor visible
+            const R = 0.07;                   // radio esquinas del canto
+            const autoSpin = 0.005;           // giro automático (mitad de velocidad)
 
-                const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
-                renderer.setClearColor(0x000000, 0);
-                renderer.setSize(window.innerWidth, window.innerHeight);
-                document.getElementById('root').appendChild(renderer.domElement);
+            // -------- Escena/Cámara --------
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(30, window.innerWidth/window.innerHeight, 0.1, 100);
+            camera.position.set(0,0,2.8);
 
-                // Luces
-                const dir = new THREE.DirectionalLight(0xffffff, 1);
-                dir.position.set(5,5,5);
-                scene.add(dir);
-                scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+            const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true, premultipliedAlpha:false });
+            renderer.setClearColor(0x000000, 0);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('root').appendChild(renderer.domElement);
 
-                // --- AlphaMap redondeado para las caras ---
-                // Creamos un canvas con rectángulo redondeado blanco sobre fondo transparente
-                function makeRoundedAlpha(aspect, px=1024) {
-                  const w = px;
-                  const h = Math.max(1, Math.round(px / aspect)); // mantiene 1.586
-                  const r = Math.round(h * 0.08);                  // radio ~8% del alto
-                  const c = document.createElement('canvas');
-                  c.width = w; c.height = h;
-                  const g = c.getContext('2d');
-                  g.clearRect(0,0,w,h);
-                  g.fillStyle = 'white';
-                  const x=0,y=0;
-                  g.beginPath();
-                  g.moveTo(x+r, y);
-                  g.lineTo(x+w-r, y);
-                  g.quadraticCurveTo(x+w, y, x+w, y+r);
-                  g.lineTo(x+w, y+h-r);
-                  g.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
-                  g.lineTo(x+r, y+h);
-                  g.quadraticCurveTo(x, y+h, x, y+h-r);
-                  g.lineTo(x, y+r);
-                  g.quadraticCurveTo(x, y, x+r, y);
-                  g.closePath();
-                  g.fill();
-                  const tex = new THREE.CanvasTexture(c);
-                  if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding; else tex.colorSpace = THREE.SRGBColorSpace;
-                  tex.needsUpdate = true;
-                  return tex;
-                }
-                const aspect = $ID_CARD_ASPECT; // 1.586
-                const alphaTex = makeRoundedAlpha(aspect);
+            // Luces
+            const dir = new THREE.DirectionalLight(0xffffff, 1);
+            dir.position.set(5,5,5);
+            scene.add(dir, new THREE.AmbientLight(0xffffff, 0.5));
 
-                // Texturas (data URLs)
-                const loader = new THREE.TextureLoader();
-                const frontTex = loader.load("$front", () => console.log('front loaded'), undefined, (e)=>console.error('front err', e));
-                const backTex  = loader.load("$back",  () => console.log('back loaded'),  undefined, (e)=>console.error('back err', e));
-                if (THREE.sRGBEncoding) {
-                  frontTex.encoding = THREE.sRGBEncoding;
-                  backTex.encoding  = THREE.sRGBEncoding;
-                } else {
-                  frontTex.colorSpace = THREE.SRGBColorSpace;
-                  backTex.colorSpace  = THREE.SRGBColorSpace;
-                }
-                frontTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-                backTex.anisotropy  = renderer.capabilities.getMaxAnisotropy();
-
-                // Geometría tarjeta (caja muy delgada)
-                const w = aspect, h = 1, d = 0.02;
-                // ⬇️ materiales: lados grises; caras con alphaMap (esquinas redondas)
-                const mats = [
-                  new THREE.MeshPhongMaterial({color:0x888888}), // lado -X
-                  new THREE.MeshPhongMaterial({color:0x888888}), // lado +X
-                  new THREE.MeshPhongMaterial({color:0x888888}), // lado -Y
-                  new THREE.MeshPhongMaterial({color:0x888888}), // lado +Y
-                  new THREE.MeshBasicMaterial({map: frontTex, alphaMap: alphaTex, transparent:true}),
-                  new THREE.MeshBasicMaterial({map: backTex,  alphaMap: alphaTex, transparent:true})
-                ];
-                const geom = new THREE.BoxGeometry(w,h,d);
-                const card = new THREE.Mesh(geom, mats);
-                scene.add(card);
-
-                // ⬇️ Animación (mitad de velocidad)
-                function animate() {
-                  requestAnimationFrame(animate);
-                  card.rotation.y += 0.005;
-                  renderer.render(scene, camera);
-                }
-                animate();
-
-                window.addEventListener('resize', () => {
-                  camera.aspect = window.innerWidth / window.innerHeight;
-                  camera.updateProjectionMatrix();
-                  renderer.setSize(window.innerWidth, window.innerHeight);
-                });
-              }
-            } catch (err) {
-              console.error('Three init error:', err);
-              const msg = document.createElement('pre');
-              msg.textContent = String(err);
-              msg.style.cssText='position:absolute;inset:0;color:#f55;background:#1118;padding:12px;white-space:pre-wrap';
-              document.body.appendChild(msg);
+            // ---- alphaMap sin halos ----
+            function makeRoundedAlpha(aspect, px=1024) {
+              const W = px, H = Math.max(1, Math.round(px / aspect));
+              const r = Math.round(H * 0.08); // ~8% del alto
+              const c = document.createElement('canvas'); c.width=W; c.height=H;
+              const g = c.getContext('2d');
+              g.clearRect(0,0,W,H); g.fillStyle='white';
+              const x=0,y=0;
+              g.beginPath();
+              g.moveTo(x+r,y);
+              g.lineTo(x+W-r,y);
+              g.quadraticCurveTo(x+W,y,x+W,y+r);
+              g.lineTo(x+W,y+H-r);
+              g.quadraticCurveTo(x+W,y+H,x+W-r,y+H);
+              g.lineTo(x+r,y+H);
+              g.quadraticCurveTo(x,y+H,x,y+H-r);
+              g.lineTo(x,y+r);
+              g.quadraticCurveTo(x,y,x+r,y);
+              g.closePath(); g.fill();
+              const tex = new THREE.CanvasTexture(c);
+              tex.wrapS = THREE.ClampToEdgeWrapping;
+              tex.wrapT = THREE.ClampToEdgeWrapping;
+              tex.generateMipmaps = false;
+              tex.minFilter = THREE.LinearFilter;
+              tex.magFilter = THREE.LinearFilter;
+              if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding; else tex.colorSpace = THREE.SRGBColorSpace;
+              tex.needsUpdate = true;
+              return tex;
             }
+            const alphaTex = makeRoundedAlpha(aspect);
+
+            // Texturas (data URLs)
+            const loader = new THREE.TextureLoader();
+            const frontTex = loader.load("$front");
+            const backTex  = loader.load("$back");
+            if (THREE.sRGBEncoding) { frontTex.encoding = THREE.sRGBEncoding; backTex.encoding = THREE.sRGBEncoding; }
+            else { frontTex.colorSpace = THREE.SRGBColorSpace; backTex.colorSpace = THREE.SRGBColorSpace; }
+
+            // ---- 1) Caja base: caras con alphaMap, lados invisibles ----
+            const matSideInvisible = new THREE.MeshBasicMaterial({ transparent:true, opacity:0.0, depthWrite:false });
+            const matFront = new THREE.MeshBasicMaterial({ map: frontTex, alphaMap: alphaTex, transparent:true, alphaTest: 0.9, depthWrite:false });
+            const matBack  = new THREE.MeshBasicMaterial({ map: backTex,  alphaMap: alphaTex, transparent:true, alphaTest: 0.9, depthWrite:false });
+
+            const cardBox = new THREE.Mesh(
+              new THREE.BoxGeometry(w,h,d),
+              [matSideInvisible, matSideInvisible, matSideInvisible, matSideInvisible, matFront, matBack]
+            );
+            scene.add(cardBox);
+
+            // ---- 2) Canto redondeado real (Extrude, solo lados) ----
+            function roundedRectShape(width, height, radius) {
+              const x = -width/2, y = -height/2;
+              const r = Math.min(radius, width/2, height/2);
+              const s = new THREE.Shape();
+              s.moveTo(x+r, y);
+              s.lineTo(x+width-r, y);
+              s.quadraticCurveTo(x+width, y, x+width, y+r);
+              s.lineTo(x+width, y+height-r);
+              s.quadraticCurveTo(x+width, y+height, x+width-r, y+height);
+              s.lineTo(x+r, y+height);
+              s.quadraticCurveTo(x, y+height, x, y+height-r);
+              s.lineTo(x, y+r);
+              s.quadraticCurveTo(x, y, x+r, y);
+              return s;
+            }
+            const shape = roundedRectShape(w, h, R);
+            const sideGeom = new THREE.ExtrudeGeometry(shape, { depth: d, bevelEnabled: false, curveSegments: 24, steps: 1 });
+            sideGeom.center();
+
+            const sideMat = new THREE.MeshPhongMaterial({ color: 0x444444, shininess: 8, specular: 0x222222 });
+            sideMat.polygonOffset = true; sideMat.polygonOffsetFactor = 1; sideMat.polygonOffsetUnits = 1;
+            const capTransparent = new THREE.MeshBasicMaterial({ transparent:true, opacity:0.0, depthWrite:false });
+            const sideMesh = new THREE.Mesh(sideGeom, [sideMat, capTransparent, capTransparent]);
+            if (sideGeom.groups?.length >= 3) {
+              sideGeom.groups[0].materialIndex = 0;
+              if (sideGeom.groups[1]) sideGeom.groups[1].materialIndex = 1;
+              if (sideGeom.groups[2]) sideGeom.groups[2].materialIndex = 2;
+            }
+            sideMesh.scale.set(0.992, 0.992, 1.0); // micro-inset bajo la máscara
+            scene.add(sideMesh);
+
+            // ---- Interacción: arrastre SOLO eje Y (horizontal) con yaw estable ----
+            let isDragging = false;
+            let startX = 0;
+            let yawStart = 0;   // yaw al iniciar drag
+            let yaw = 0;        // yaw actual (fuente de verdad)
+            const dragSensitivity = 0.005;
+
+            function applyRotation(rx, ry) {
+              cardBox.rotation.x = rx; cardBox.rotation.y = ry;
+              sideMesh.rotation.x = rx; sideMesh.rotation.y = ry;
+            }
+
+            const el = renderer.domElement;
+            el.style.touchAction = 'none';
+
+            el.addEventListener('pointerdown', (e) => {
+              isDragging = true;
+              startX = e.clientX;
+              yawStart = yaw;               // no reiniciamos: guardamos estado
+              el.setPointerCapture(e.pointerId);
+              e.preventDefault();
+            }, { passive:false });
+
+            el.addEventListener('pointermove', (e) => {
+              if (!isDragging) return;
+              const dx = e.clientX - startX;
+              yaw = yawStart + dx * dragSensitivity; // yaw continuo sin saltos
+              e.preventDefault();
+            }, { passive:false });
+
+            function stopDrag(e) {
+              isDragging = false;
+              if (e) e.preventDefault();
+            }
+            el.addEventListener('pointerup', stopDrag);
+            el.addEventListener('pointercancel', stopDrag);
+            el.addEventListener('pointerleave', stopDrag);
+
+            // ---- Animación (autoSpin cuando NO arrastras) ----
+            function animate() {
+              requestAnimationFrame(animate);
+              if (!isDragging) yaw += autoSpin;
+              applyRotation(0, yaw);
+              renderer.render(scene, camera);
+            }
+            animate();
+
+            // Resize
+            window.addEventListener('resize', () => {
+              camera.aspect = window.innerWidth / window.innerHeight;
+              camera.updateProjectionMatrix();
+              renderer.setSize(window.innerWidth, window.innerHeight);
+            });
           </script>
         </body>
         </html>
