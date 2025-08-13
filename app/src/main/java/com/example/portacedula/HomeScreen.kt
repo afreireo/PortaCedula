@@ -46,7 +46,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import android.view.View
-
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
 
 
 // Proporción real de una cédula/tarjeta (ISO/IEC 7810 ID‑1: 85.60 × 53.98 mm)
@@ -60,6 +63,7 @@ fun Context.findActivity(): Activity? = when (this) {
     is ContextWrapper -> baseContext.findActivity()
     else -> null
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,51 +123,74 @@ fun HomeScreen(vm: HomeViewModel) {
             }
         }
     ) { pad ->
-        Column(
-            Modifier
-                .padding(pad)
-                .padding(16.dp)
-                .fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(pad),
+            contentPadding = PaddingValues(bottom = 88.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Rotating3DCard(
-                frontUri = ui.frontUri,
-                backUri = ui.backUri,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(ID_CARD_ASPECT)
-            )
+            // Tarjeta 3D arriba (ocupa ancho completo)
+            item {
+                Rotating3DCard(
+                    frontUri = ui.frontUri,
+                    backUri = ui.backUri,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(ID_CARD_ASPECT)
+                        .padding(horizontal = 12.dp)
+                )
+            }
 
-            IdCardSection(
-                title = "Parte anverso",
-                uri = ui.frontUri,
-                onAdd = { launchDocScanner { uri -> vm.onFrontCaptured(uri.toString()) } },
-                onOpen = { ui.frontUri?.let(vm::onZoom) }
-            )
-            IdCardSection(
-                title = "Parte reverso",
-                uri = ui.backUri,
-                onAdd = { launchDocScanner { uri -> vm.onBackCaptured(uri.toString()) } },
-                onOpen = { ui.backUri?.let(vm::onZoom) }
-            )
+            // Anverso reducido (90% del ancho)
+            item {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Column(Modifier.fillMaxWidth(0.85f)) {
+                        IdCardSection(
+                            title = "Parte anverso",
+                            uri = ui.frontUri,
+                            onAdd = { launchDocScanner { uri -> vm.onFrontCaptured(uri.toString()) } },
+                            onOpen = { ui.frontUri?.let(vm::onZoom) }
+                        )
+                    }
+                }
+            }
+
+            // Reverso reducido (90% del ancho)
+            item {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Column(Modifier.fillMaxWidth(0.85f)) {
+                        IdCardSection(
+                            title = "Parte reverso",
+                            uri = ui.backUri,
+                            onAdd = { launchDocScanner { uri -> vm.onBackCaptured(uri.toString()) } },
+                            onOpen = { ui.backUri?.let(vm::onZoom) }
+                        )
+                    }
+                }
+            }
+
+            item { Spacer(Modifier.height(24.dp)) }
         }
     }
 
-    // Bottom sheet con opciones del FAB
+    // Bottom sheet con opciones del FAB (con scroll por si hay poco alto disponible)
     if (ui.showAddSheet) {
         ModalBottomSheet(onDismissRequest = { vm.toggleAddSheet(false) }) {
             Column(
                 Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Rotating3DCard(
                     frontUri = ui.frontUri,
                     backUri  = ui.backUri,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(ID_CARD_ASPECT) // mantiene formato de tarjeta
+                        .aspectRatio(ID_CARD_ASPECT)
                 )
 
                 Text("Agregar", style = MaterialTheme.typography.titleMedium)
@@ -186,21 +213,21 @@ fun HomeScreen(vm: HomeViewModel) {
         }
     }
 
-    // Zoom de imagen (opción A: llena contenedor de tarjeta, recorta bordes con Crop)
+    // Zoom de imagen
     if (ui.showZoom != null) {
         Dialog(onDismissRequest = { vm.onZoom(null) }) {
             Surface(shape = RoundedCornerShape(16.dp), tonalElevation = 2.dp) {
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .aspectRatio(ID_CARD_ASPECT) // mantiene proporción de tarjeta en el zoom
+                        .aspectRatio(ID_CARD_ASPECT)
                         .clickable { vm.onZoom(null) },
                     contentAlignment = Alignment.Center
                 ) {
                     AsyncImage(
                         model = ui.showZoom,
                         contentDescription = null,
-                        contentScale = ContentScale.Crop, // ← recorta bordes extra del escáner
+                        contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -208,42 +235,6 @@ fun HomeScreen(vm: HomeViewModel) {
         }
     }
 }
-
-@Composable
-private fun IdCardSection(
-    title: String,
-    uri: String?,
-    onAdd: () -> Unit,
-    onOpen: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
-
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(ID_CARD_ASPECT) // ← formato ID‑1 exacto
-                .clickable { if (uri != null) onOpen() else onAdd() },
-            shape = RoundedCornerShape(16.dp),
-            tonalElevation = 2.dp
-        ) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                if (uri == null) {
-                    Text("Toca para agregar", textAlign = TextAlign.Center)
-                } else {
-                    AsyncImage(
-                        model = uri,
-                        contentDescription = title,
-                        contentScale = ContentScale.Crop, // ← ajusta, recortando bordes si sobran
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-            }
-        }
-    }
-}
-
-
 
 
 @Composable
@@ -407,7 +398,7 @@ fun Rotating3DCard(
             }
 
             const el = renderer.domElement;
-            el.style.touchAction = 'none';
+            el.style.touchAction = 'pan-y';
 
             el.addEventListener('pointerdown', (e) => {
               isDragging = true;
@@ -496,4 +487,39 @@ private fun placeholderSvgBase64(text: String): String {
         </svg>
     """.trimIndent()
     return "data:image/svg+xml;base64," + Base64.encodeToString(svg.toByteArray(), Base64.NO_WRAP)
+}
+
+@Composable
+fun IdCardSection(
+    title: String,
+    uri: String?,
+    onAdd: () -> Unit,
+    onOpen: () -> Unit
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(ID_CARD_ASPECT)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFFE0E0E0))
+                .clickable { if (uri != null) onOpen() else onAdd() },
+            contentAlignment = Alignment.Center
+        ) {
+            if (uri != null) {
+                AsyncImage(
+                    model = uri,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Text("Agregar", color = Color.Gray)
+            }
+        }
+    }
 }
