@@ -120,10 +120,17 @@ fun HomeScreen(vm: HomeViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Porta Cédula") }, // alineado a la izquierda por defecto
-                colors = TopAppBarDefaults.topAppBarColors()
+                title = {
+                    Text(
+                        "Porta Cédula",
+                        color = MaterialTheme.colorScheme.primary, // Solo cambia el color del texto
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors() // Barra igual que antes
             )
-        },
+        }
+        ,
         floatingActionButton = {
             FloatingActionButton(onClick = { vm.toggleAddSheet(true) },
                 containerColor = MaterialTheme.colorScheme.primary,

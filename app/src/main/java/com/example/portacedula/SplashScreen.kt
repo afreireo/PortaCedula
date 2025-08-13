@@ -21,7 +21,7 @@ fun SplashScreen(onDone: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         Text(
-            "Porta Cedula",
+            "Porta Cédula",
             style = MaterialTheme.typography.headlineLarge.copy(
                 color = MaterialTheme.colorScheme.onPrimary,
                 fontWeight = FontWeight.Bold
