@@ -116,6 +116,7 @@ fun HomeScreen(vm: HomeViewModel) {
             }
     }
 
+
     // -------- UI principal --------
     Scaffold(
         topBar = {
