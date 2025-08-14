@@ -93,7 +93,6 @@ fun HomeScreen(vm: HomeViewModel) {
             }
         }
     }
-
     fun launchDocScanner(onImage: (Uri) -> Unit) {
         val act = activity ?: run {
             Toast.makeText(context, "No se encontró Activity", Toast.LENGTH_SHORT).show()
