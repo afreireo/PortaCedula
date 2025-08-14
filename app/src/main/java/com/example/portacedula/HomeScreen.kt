@@ -37,6 +37,7 @@ import kotlinx.coroutines.delay
 import kotlin.math.abs
 
 import android.util.Base64
+import android.view.MotionEvent
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
@@ -393,7 +394,7 @@ fun Rotating3DCard(
             }
 
             const el = renderer.domElement;
-            el.style.touchAction = 'pan-y';
+            el.style.touchAction = 'none';
 
             el.addEventListener('pointerdown', (e) => {
               isDragging = true;
@@ -443,6 +444,30 @@ fun Rotating3DCard(
         modifier = modifier,
         factory = { ctx ->
             WebView(ctx).apply {
+                // --- ajustes clave ---
+                isNestedScrollingEnabled = false
+                overScrollMode = View.OVER_SCROLL_NEVER
+                isVerticalScrollBarEnabled = false
+                isHorizontalScrollBarEnabled = false
+
+                setOnTouchListener { v, ev ->
+                    when (ev.actionMasked) {
+                        MotionEvent.ACTION_DOWN,
+                        MotionEvent.ACTION_MOVE,
+                        MotionEvent.ACTION_POINTER_DOWN -> {
+                            // Evita que la LazyColumn intercepte el gesto
+                            v.parent?.requestDisallowInterceptTouchEvent(true)
+                        }
+                        MotionEvent.ACTION_UP,
+                        MotionEvent.ACTION_CANCEL -> {
+                            v.parent?.requestDisallowInterceptTouchEvent(false)
+                        }
+                    }
+                    // Deja que el WebView procese el evento normalmente
+                    false
+                }
+
+                // --- lo que ya tenías ---
                 WebView.setWebContentsDebuggingEnabled(true)
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 settings.javaScriptEnabled = true
@@ -455,7 +480,10 @@ fun Rotating3DCard(
                 webViewClient = WebViewClient()
                 webChromeClient = object : WebChromeClient() {
                     override fun onConsoleMessage(cm: ConsoleMessage): Boolean {
-                        android.util.Log.d("WV", "${cm.messageLevel()}: ${cm.message()} @${cm.sourceId()}:${cm.lineNumber()}")
+                        android.util.Log.d(
+                            "WV",
+                            "${cm.messageLevel()}: ${cm.message()} @${cm.sourceId()}:${cm.lineNumber()}"
+                        )
                         return super.onConsoleMessage(cm)
                     }
                 }
