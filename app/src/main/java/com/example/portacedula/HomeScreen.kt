@@ -1,6 +1,7 @@
 @file:Suppress("SetJavaScriptEnabled")
 package com.example.portacedula
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -234,6 +235,7 @@ fun HomeScreen(vm: HomeViewModel) {
 }
 
 
+@SuppressLint("ClickableViewAccessibility")
 @Composable
 fun Rotating3DCard(
     frontUri: String?,
