@@ -126,7 +126,7 @@ fun HomeScreen(vm: HomeViewModel) {
                 title = {
                     Text(
                         "Porta Cédula",
-                        color = MaterialTheme.colorScheme.primary, // Solo cambia el color del texto
+                        color = MaterialTheme.colorScheme.onBackground, // Solo cambia el color del texto
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -137,7 +137,7 @@ fun HomeScreen(vm: HomeViewModel) {
         floatingActionButton = {
             FloatingActionButton(onClick = { vm.toggleAddSheet(true) },
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary )
+                contentColor = MaterialTheme.colorScheme.onBackground )
             {
                 Icon(Icons.Default.Edit, contentDescription = "Editar")
             }
@@ -159,7 +159,7 @@ fun HomeScreen(vm: HomeViewModel) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(ID_CARD_ASPECT)
-                        .padding(horizontal = 12.dp)
+                        .padding(horizontal = 4.dp)
                 )
             }
 
@@ -291,10 +291,11 @@ fun Rotating3DCard(
             // -------- Escena/Cámara --------
             const scene = new THREE.Scene();
             const camera = new THREE.PerspectiveCamera(30, window.innerWidth/window.innerHeight, 0.1, 100);
-            camera.position.set(0,0,2.8);
+            camera.position.set(0,0,2.55);
 
             const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true, premultipliedAlpha:false });
             renderer.setClearColor(0x000000, 0);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('root').appendChild(renderer.domElement);
 

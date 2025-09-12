@@ -3,6 +3,8 @@ package com.example.portacedula
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -14,8 +16,9 @@ import com.example.portacedula.ui.theme.PortaCedulaTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         val repo = IdCardRepository(applicationContext)
-
+        enableEdgeToEdge() //Barra transparente
         setContent {
             PortaCedulaTheme {
                 val nav = rememberNavController()

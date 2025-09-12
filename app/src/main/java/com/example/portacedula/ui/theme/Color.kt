@@ -3,11 +3,13 @@ package com.example.portacedula.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // Light theme
-val Blue80 = Color(0xFF82B1FF)       // Azul claro para light mode
-val BlueGrey80 = Color(0xFFB3CDE0)   // Gris azulado claro
-val Cyan80 = Color(0xFF80DEEA)       // Toque de cian claro
 
-// Dark theme
-val Blue40 = Color(0xFF1565C0)       // Azul intenso (primary dark)
-val BlueGrey40 = Color(0xFF37474F)   // Gris azulado oscuro
-val Cyan40 = Color(0xFF0097A7)       // Toque de cian oscuro
+// Paleta Light (tonos más claros)
+val Blue40 = Color(0xFF90CAF9)        // Azul claro
+val BlueGrey40 = Color(0xFFB0BEC5)    // Azul grisáceo claro
+val Cyan40 = Color(0xFF80DEEA)        // Cian claro
+
+// Paleta Dark (tonos más oscuros)
+val Blue80 = Color(0xFF1565C0)        // Azul fuerte
+val BlueGrey80 = Color(0xFF455A64)    // Azul grisáceo oscuro
+val Cyan80 = Color(0xFF00838F)
