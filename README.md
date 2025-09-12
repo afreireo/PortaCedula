@@ -5,7 +5,7 @@
 
 App para crear y llevar una copia digital de cédula personal.
 
-[Descargar](sha256:3acaf65a81b53cd9106152b0a374a25c3e53bba4c26802226fc1c0fd63ff2579)
+[Descargar](https://github.com/afreireo/PortaCedula/releases/download/latest/PortaCedula-1.1.0.apk)
 
 * Modelo 3d y vista plana
 * Escaner automatico integrado
