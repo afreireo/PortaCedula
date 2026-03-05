@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -259,7 +260,7 @@ fun NewCardView(vm: HomeViewModel) {
             TopAppBar(
                 title = { Text(draft.name, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = { vm.cancelAddingCard() }) { Icon(Icons.Default.Close, contentDescription = "Cancelar") }
+                    IconButton(onClick = { vm.cancelAddingCard() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Cancelar") }
                 },
                 actions = {
                     if (draft.frontUri != null && draft.backUri != null) {
@@ -332,11 +333,16 @@ fun CardDetailDialog(card: IdCard, vm: HomeViewModel, onClose: () -> Unit) {
                 onClose()
             }
         }, 
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
         Scaffold(
+            modifier = Modifier.fillMaxSize(),
             topBar = {
                 TopAppBar(
+                    modifier = Modifier.statusBarsPadding(),
                     title = { 
                         Box {
                             AnimatedVisibility(
@@ -357,7 +363,7 @@ fun CardDetailDialog(card: IdCard, vm: HomeViewModel, onClose: () -> Unit) {
                     },
                     navigationIcon = {
                         if (ui.selectedPart == null) {
-                            IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = "Cerrar") }
+                            IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás") }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = appBarContainerColor),
@@ -390,7 +396,8 @@ fun CardDetailDialog(card: IdCard, vm: HomeViewModel, onClose: () -> Unit) {
                     FloatingActionButton(
                         onClick = { PdfGenerator.generateAndShare(context, card) },
                         containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.navigationBarsPadding().padding(bottom = 80.dp)
                     ) { Icon(Icons.Default.Share, contentDescription = "Compartir") }
                 }
             }
