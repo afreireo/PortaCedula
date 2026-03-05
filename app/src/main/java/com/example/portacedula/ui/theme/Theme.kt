@@ -30,7 +30,7 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun PortaCedulaTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false, // Forzado a false para usar siempre el azul
+    dynamicColor: Boolean = true, // Siempre activo como pediste
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {

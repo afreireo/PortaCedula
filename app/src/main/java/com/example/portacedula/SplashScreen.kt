@@ -9,13 +9,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(onDone: () -> Unit) {
     LaunchedEffect(Unit) {
-        delay(900) // ✅ más limpio
+        delay(900)
         onDone()
     }
 
@@ -26,11 +29,14 @@ fun SplashScreen(onDone: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "Porta Cédula",
-            style = MaterialTheme.typography.headlineLarge.copy(
-                fontWeight = FontWeight.Bold
-            ),
-            color = MaterialTheme.colorScheme.onBackground // ✅ color explícito
+            text = buildAnnotatedString {
+                append("Cedula")
+                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                    append("EC")
+                }
+            },
+            style = MaterialTheme.typography.headlineLarge,
+            color = MaterialTheme.colorScheme.onBackground
         )
     }
 }

@@ -29,7 +29,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
@@ -93,7 +96,14 @@ fun HomeScreen(vm: HomeViewModel) {
                             enter = fadeIn(animationSpec = tween(200)),
                             exit = fadeOut(animationSpec = tween(200))
                         ) {
-                            Text("Porta Cédula", fontWeight = FontWeight.Bold)
+                            Text(
+                                buildAnnotatedString {
+                                    append("Cedula")
+                                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                                        append("EC")
+                                    }
+                                }
+                            )
                         }
                         AnimatedVisibility(
                             visible = ui.selectedPart != null,

@@ -15,7 +15,6 @@ data class HomeUiState(
     val favoriteCard: IdCard? = null,
     val showZoom: String? = null,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val useDynamicColor: Boolean = true,
     
     // Estados para edición/selección en Home
     val selectedPart: CardPart? = null,
@@ -44,11 +43,6 @@ class HomeViewModel(private val repo: IdCardRepository) : ViewModel() {
         viewModelScope.launch {
             repo.themeFlow.collect { mode ->
                 _ui.update { it.copy(themeMode = mode) }
-            }
-        }
-        viewModelScope.launch {
-            repo.dynamicColorFlow.collect { enabled ->
-                _ui.update { it.copy(useDynamicColor = enabled) }
             }
         }
     }
@@ -141,9 +135,5 @@ class HomeViewModel(private val repo: IdCardRepository) : ViewModel() {
     
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch {
         repo.setThemeMode(mode)
-    }
-
-    fun setDynamicColor(enabled: Boolean) = viewModelScope.launch {
-        repo.setDynamicColor(enabled)
     }
 }
