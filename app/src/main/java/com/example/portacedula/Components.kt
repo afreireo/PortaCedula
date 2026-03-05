@@ -12,15 +12,17 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.rememberTransformableState
-import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -42,6 +44,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
 import coil.compose.AsyncImage
+import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import kotlin.math.roundToInt
 
@@ -249,18 +252,9 @@ fun FullscreenImageViewer(uri: String, onClose: () -> Unit) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
-    var swipeOffsetY by remember { mutableFloatStateOf(0f) }
-
-    val transformState = rememberTransformableState { zoomChange, panChange, _ ->
-        val newScale = (scale * zoomChange).coerceIn(1f, 5f)
-        if (newScale > 1f) {
-            offsetX += panChange.x
-            offsetY += panChange.y
-        } else {
-            offsetX = 0f; offsetY = 0f
-        }
-        scale = newScale
-    }
+    
+    val swipeOffsetY = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
 
     BackHandler(onBack = onClose)
 
@@ -268,22 +262,68 @@ fun FullscreenImageViewer(uri: String, onClose: () -> Unit) {
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
+        val currentSwipeOffset = swipeOffsetY.value
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black)
+                .background(Color.Black.copy(alpha = (1f - (currentSwipeOffset / 600f)).coerceIn(0f, 1f)))
                 .pointerInput(Unit) {
-                    detectDragGestures(
-                        onDrag = { _, dragAmount ->
-                            if (scale == 1f) {
-                                swipeOffsetY += dragAmount.y
+                    detectTapGestures(
+                        onDoubleTap = {
+                            if (scale > 1f) {
+                                scale = 1f; offsetX = 0f; offsetY = 0f
+                            } else {
+                                scale = 3f
                             }
-                        },
-                        onDragEnd = {
-                            if (swipeOffsetY > 300) onClose() else swipeOffsetY = 0f
                         }
                     )
                 }
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        var isMultiTouch = false
+                        do {
+                            val event = awaitPointerEvent()
+                            if (event.changes.size > 1) isMultiTouch = true
+                            
+                            val zoom = event.calculateZoom()
+                            val pan = event.calculatePan()
+
+                            if (scale > 1f || isMultiTouch) {
+                                // Modo Zoom/Pan activo (se ignoran gestos de cierre)
+                                val newScale = (scale * zoom).coerceIn(1f, 5f)
+                                scale = newScale
+                                offsetX += pan.x
+                                offsetY += pan.y
+                                
+                                if (scale <= 1f) {
+                                    scale = 1f; offsetX = 0f; offsetY = 0f
+                                }
+                                
+                                // Si estamos operando el zoom, reseteamos el swipe down
+                                if (swipeOffsetY.value != 0f) {
+                                    scope.launch { swipeOffsetY.snapTo(0f) }
+                                }
+                            } else if (scale == 1f && !isMultiTouch) {
+                                // Modo Cierre (solo 1 dedo, sin zoom y permitiendo arrastrar la imagen hacia abajo)
+                                scope.launch {
+                                    swipeOffsetY.snapTo((swipeOffsetY.value + pan.y).coerceAtLeast(0f))
+                                }
+                            }
+                            event.changes.forEach { it.consume() }
+                        } while (event.changes.any { it.pressed })
+
+                        // Al soltar los dedos
+                        if (swipeOffsetY.value > 180) {
+                            onClose()
+                        } else {
+                            scope.launch {
+                                swipeOffsetY.animateTo(0f)
+                            }
+                        }
+                    }
+                },
+            contentAlignment = Alignment.Center
         ) {
             AsyncImage(
                 model = uri,
@@ -291,22 +331,10 @@ fun FullscreenImageViewer(uri: String, onClose: () -> Unit) {
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()
-                    .offset { IntOffset(0, swipeOffsetY.roundToInt()) }
+                    .offset { IntOffset(offsetX.roundToInt(), (offsetY + currentSwipeOffset).roundToInt()) }
                     .graphicsLayer {
                         scaleX = scale
                         scaleY = scale
-                        translationX = offsetX
-                        translationY = offsetY
-                        alpha = (1f - (swipeOffsetY / 600f)).coerceIn(0.1f, 1f)
-                    }
-                    .transformable(transformState)
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onDoubleTap = {
-                                scale = if (scale > 1f) 1f else 2f
-                                offsetX = 0f; offsetY = 0f
-                            }
-                        )
                     }
             )
 
