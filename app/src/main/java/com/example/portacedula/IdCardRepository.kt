@@ -1,6 +1,7 @@
 package com.example.portacedula
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -13,6 +14,7 @@ private val Context.dataStore by preferencesDataStore("idcard_prefs")
 class IdCardRepository(private val context: Context) {
     private val KEY_CARDS = stringPreferencesKey("cards_list")
     private val KEY_THEME = stringPreferencesKey("theme_mode")
+    private val KEY_DYNAMIC_COLOR = booleanPreferencesKey("use_dynamic_color")
 
     val cardsFlow = context.dataStore.data.map { p ->
         val json = p[KEY_CARDS] ?: "[]"
@@ -32,6 +34,10 @@ class IdCardRepository(private val context: Context) {
         }
     }
 
+    val dynamicColorFlow = context.dataStore.data.map { p ->
+        p[KEY_DYNAMIC_COLOR] ?: true
+    }
+
     suspend fun saveCards(cards: List<IdCard>) {
         context.dataStore.edit { it[KEY_CARDS] = Json.encodeToString(cards) }
     }
@@ -46,5 +52,9 @@ class IdCardRepository(private val context: Context) {
 
     suspend fun setThemeMode(mode: ThemeMode) {
         context.dataStore.edit { it[KEY_THEME] = mode.name }
+    }
+
+    suspend fun setDynamicColor(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_DYNAMIC_COLOR] = enabled }
     }
 }

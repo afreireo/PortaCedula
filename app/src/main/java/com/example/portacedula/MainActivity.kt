@@ -55,7 +55,10 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.DARK -> true
             }
 
-            PortaCedulaTheme(darkTheme = darkTheme) {
+            PortaCedulaTheme(
+                darkTheme = darkTheme,
+                dynamicColor = ui.useDynamicColor
+            ) {
                 val navController = rememberNavController()
 
                 // Visor de Zoom GLOBAL
