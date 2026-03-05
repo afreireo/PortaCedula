@@ -4,21 +4,33 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore("idcard_prefs")
 
 class IdCardRepository(private val context: Context) {
-    private val KEY_FRONT = stringPreferencesKey("front_uri")
-    private val KEY_BACK  = stringPreferencesKey("back_uri")
+    private val KEY_CARDS = stringPreferencesKey("cards_list")
 
-    val cardFlow = context.dataStore.data.map { p ->
-        IdCard(
-            p[KEY_FRONT].takeUnless { it.isNullOrBlank() },
-            p[KEY_BACK].takeUnless { it.isNullOrBlank() }
-        )
+    val cardsFlow = context.dataStore.data.map { p ->
+        val json = p[KEY_CARDS] ?: "[]"
+        try {
+            Json.decodeFromString<List<IdCard>>(json)
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
-    suspend fun setFront(uri: String?) { context.dataStore.edit { it[KEY_FRONT] = uri.orEmpty() } }
-    suspend fun setBack(uri: String?)  { context.dataStore.edit { it[KEY_BACK]  = uri.orEmpty() } }
+    suspend fun saveCards(cards: List<IdCard>) {
+        context.dataStore.edit { it[KEY_CARDS] = Json.encodeToString(cards) }
+    }
+
+    suspend fun addCard(card: IdCard) {
+        context.dataStore.edit { p ->
+            val current = (Json.decodeFromString<List<IdCard>>(p[KEY_CARDS] ?: "[]")).toMutableList()
+            current.add(card)
+            p[KEY_CARDS] = Json.encodeToString(current)
+        }
+    }
 }
