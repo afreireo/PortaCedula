@@ -12,6 +12,9 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -24,12 +27,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
+import androidx.compose.foundation.gestures.detectTapGestures
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,12 +87,21 @@ fun HomeScreen(vm: HomeViewModel) {
         topBar = {
             TopAppBar(
                 title = { 
-                    AnimatedVisibility(
-                        visible = ui.selectedPart == null,
-                        enter = fadeIn(animationSpec = tween(200)),
-                        exit = fadeOut(animationSpec = tween(200))
-                    ) {
-                        Text("Porta Cédula", fontWeight = FontWeight.Bold)
+                    Box {
+                        AnimatedVisibility(
+                            visible = ui.selectedPart == null,
+                            enter = fadeIn(animationSpec = tween(200)),
+                            exit = fadeOut(animationSpec = tween(200))
+                        ) {
+                            Text("Porta Cédula", fontWeight = FontWeight.Bold)
+                        }
+                        AnimatedVisibility(
+                            visible = ui.selectedPart != null,
+                            enter = fadeIn(animationSpec = tween(200)),
+                            exit = fadeOut(animationSpec = tween(200))
+                        ) {
+                            Text("Modificar", fontWeight = FontWeight.Bold)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -136,20 +150,34 @@ fun HomeScreen(vm: HomeViewModel) {
             }
         }
     ) { pad ->
-        if (card == null) {
-            Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) {
-                Text("No hay tarjeta favorita.\nConfigúrala en la pestaña Tarjetas.", textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Box(Modifier.fillMaxSize()) {
+            if (card == null) {
+                Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) {
+                    Text("No hay tarjeta favorita.\nConfigúrala en la pestaña Tarjetas.", textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                }
+            } else {
+                CardContentView(
+                    card = card,
+                    modifier = Modifier.padding(pad),
+                    selectedPart = ui.selectedPart,
+                    onFrontAdd = { launchDocScanner { uri -> vm.onFrontCaptured(card.id, uri.toString()) } },
+                    onBackAdd = { launchDocScanner { uri -> vm.onBackCaptured(card.id, uri.toString()) } },
+                    onZoom = { vm.onZoom(it) },
+                    onPartLongClick = { vm.selectPart(it) }
+                )
             }
-        } else {
-            CardContentView(
-                card = card,
-                modifier = Modifier.padding(pad),
-                selectedPart = ui.selectedPart,
-                onFrontAdd = { launchDocScanner { uri -> vm.onFrontCaptured(card.id, uri.toString()) } },
-                onBackAdd = { launchDocScanner { uri -> vm.onBackCaptured(card.id, uri.toString()) } },
-                onZoom = { vm.onZoom(it) },
-                onPartLongClick = { vm.selectPart(it) }
-            )
+
+            // Overlay invisible que captura todos los clics para salir del modo edición
+            if (ui.selectedPart != null) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(pad)
+                        .pointerInput(Unit) {
+                            detectTapGestures(onTap = { vm.clearPartSelection() })
+                        }
+                )
+            }
         }
     }
 

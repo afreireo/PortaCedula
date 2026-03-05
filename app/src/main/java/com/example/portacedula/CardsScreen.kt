@@ -15,7 +15,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -27,6 +30,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -69,15 +73,21 @@ fun CardsScreen(vm: HomeViewModel) {
         topBar = {
             TopAppBar(
                 title = { 
-                    AnimatedVisibility(
-                        visible = ui.selectedCards.isEmpty(),
-                        enter = fadeIn(animationSpec = tween(200)),
-                        exit = fadeOut(animationSpec = tween(200))
-                    ) {
-                        Text("Mis Tarjetas", fontWeight = FontWeight.Bold)
-                    }
-                    if (ui.selectedCards.isNotEmpty()) {
-                        Text("${ui.selectedCards.size} seleccionadas", fontWeight = FontWeight.Bold)
+                    Box {
+                        AnimatedVisibility(
+                            visible = ui.selectedCards.isEmpty(),
+                            enter = fadeIn(animationSpec = tween(200)),
+                            exit = fadeOut(animationSpec = tween(200))
+                        ) {
+                            Text("Mis Tarjetas", fontWeight = FontWeight.Bold)
+                        }
+                        AnimatedVisibility(
+                            visible = ui.selectedCards.isNotEmpty(),
+                            enter = fadeIn(animationSpec = tween(200)),
+                            exit = fadeOut(animationSpec = tween(200))
+                        ) {
+                            Text("Modificar", fontWeight = FontWeight.Bold)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = appBarContainerColor),
@@ -90,9 +100,6 @@ fun CardsScreen(vm: HomeViewModel) {
                         Row {
                             IconButton(onClick = { vm.deleteSelectedCards() }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Eliminar")
-                            }
-                            IconButton(onClick = { vm.clearCardSelection() }) {
-                                Icon(Icons.Default.Close, contentDescription = "Cancelar")
                             }
                         }
                     }
@@ -107,14 +114,23 @@ fun CardsScreen(vm: HomeViewModel) {
             }
         }
     ) { pad ->
+        val contentModifier = Modifier
+            .fillMaxSize()
+            .padding(pad)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                enabled = ui.selectedCards.isNotEmpty()
+            ) { vm.clearCardSelection() }
+
         if (ui.cards.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) {
+            Box(contentModifier, contentAlignment = Alignment.Center) {
                 Text("No tienes tarjetas guardadas.")
             }
         } else {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(1),
-                modifier = Modifier.fillMaxSize().padding(pad),
+                modifier = contentModifier,
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -308,21 +324,41 @@ fun CardDetailDialog(card: IdCard, vm: HomeViewModel, onClose: () -> Unit) {
         label = "appBarColorDetail"
     )
 
-    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(
+        onDismissRequest = { 
+            if (ui.selectedPart != null) {
+                vm.clearPartSelection()
+            } else {
+                onClose()
+            }
+        }, 
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Scaffold(
             topBar = {
                 TopAppBar(
                     title = { 
-                        AnimatedVisibility(
-                            visible = ui.selectedPart == null,
-                            enter = fadeIn(animationSpec = tween(200)),
-                            exit = fadeOut(animationSpec = tween(200))
-                        ) {
-                            Text("Detalle", fontWeight = FontWeight.Bold)
+                        Box {
+                            AnimatedVisibility(
+                                visible = ui.selectedPart == null,
+                                enter = fadeIn(animationSpec = tween(200)),
+                                exit = fadeOut(animationSpec = tween(200))
+                            ) {
+                                Text("Detalle", fontWeight = FontWeight.Bold)
+                            }
+                            AnimatedVisibility(
+                                visible = ui.selectedPart != null,
+                                enter = fadeIn(animationSpec = tween(200)),
+                                exit = fadeOut(animationSpec = tween(200))
+                            ) {
+                                Text("Modificar", fontWeight = FontWeight.Bold)
+                            }
                         }
                     },
                     navigationIcon = {
-                        IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = "Cerrar") }
+                        if (ui.selectedPart == null) {
+                            IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = "Cerrar") }
+                        }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = appBarContainerColor),
                     actions = {
@@ -343,7 +379,6 @@ fun CardDetailDialog(card: IdCard, vm: HomeViewModel, onClose: () -> Unit) {
                                         }
                                     }) { Icon(Icons.Default.Edit, contentDescription = "Editar") }
                                     IconButton(onClick = { vm.deletePart(card.id, ui.selectedPart!!) }) { Icon(Icons.Default.Delete, contentDescription = "Eliminar") }
-                                    IconButton(onClick = { vm.clearPartSelection() }) { Icon(Icons.Default.Close, contentDescription = "Cancelar") }
                                 }
                             }
                         }
@@ -360,15 +395,29 @@ fun CardDetailDialog(card: IdCard, vm: HomeViewModel, onClose: () -> Unit) {
                 }
             }
         ) { pad ->
-            CardContentView(
-                card = card,
-                modifier = Modifier.padding(pad),
-                selectedPart = ui.selectedPart,
-                onFrontAdd = { launchDocScanner { uri -> vm.onFrontCaptured(card.id, uri.toString()) } },
-                onBackAdd = { launchDocScanner { uri -> vm.onBackCaptured(card.id, uri.toString()) } },
-                onZoom = { vm.onZoom(it) },
-                onPartLongClick = { vm.selectPart(it) }
-            )
+            Box(Modifier.fillMaxSize()) {
+                CardContentView(
+                    card = card,
+                    modifier = Modifier.padding(pad),
+                    selectedPart = ui.selectedPart,
+                    onFrontAdd = { launchDocScanner { uri -> vm.onFrontCaptured(card.id, uri.toString()) } },
+                    onBackAdd = { launchDocScanner { uri -> vm.onBackCaptured(card.id, uri.toString()) } },
+                    onZoom = { vm.onZoom(it) },
+                    onPartLongClick = { vm.selectPart(it) }
+                )
+
+                // Overlay invisible para salir del modo edición al tocar fuera
+                if (ui.selectedPart != null) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .padding(pad)
+                            .pointerInput(Unit) {
+                                detectTapGestures(onTap = { vm.clearPartSelection() })
+                            }
+                    )
+                }
+            }
         }
     }
 }

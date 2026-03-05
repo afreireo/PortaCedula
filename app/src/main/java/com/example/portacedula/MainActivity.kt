@@ -109,7 +109,10 @@ fun MainPagerScreen(vm: HomeViewModel) {
                             label = { Text(label) },
                             selected = isSelected,
                             onClick = {
-                                if (!isSelected) {
+                                if (ui.selectedPart != null || ui.selectedCards.isNotEmpty()) {
+                                    vm.clearPartSelection()
+                                    vm.clearCardSelection()
+                                } else if (!isSelected) {
                                     scope.launch { 
                                         pagerState.animateScrollToPage(index) 
                                     }
