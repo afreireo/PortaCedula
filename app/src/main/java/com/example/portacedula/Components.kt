@@ -1,6 +1,8 @@
 package com.example.portacedula
 
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
 import android.view.MotionEvent
@@ -38,8 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.net.toUri
 import coil.compose.AsyncImage
+import java.io.ByteArrayOutputStream
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -102,31 +104,34 @@ fun Rotating3DCard(
     var currentFrontUrl by remember { mutableStateOf(placeholderSvgBase64("Anverso")) }
     var currentBackUrl by remember { mutableStateOf(placeholderSvgBase64("Reverso")) }
 
+    fun processUri(uriStr: String?): String? {
+        if (uriStr == null) return null
+        return try {
+            context.contentResolver.openInputStream(Uri.parse(uriStr))?.use { input ->
+                val bitmap = BitmapFactory.decodeStream(input)
+                val out = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 60, out)
+                bitmap.recycle()
+                "data:image/jpeg;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
+            }
+        } catch (e: Exception) { null }
+    }
+
     LaunchedEffect(frontUri) {
-        frontUri?.let { u ->
-            val data = try {
-                context.contentResolver.openInputStream(u.toUri())?.use {
-                    "data:image/jpeg;base64," + Base64.encodeToString(it.readBytes(), Base64.NO_WRAP)
-                }
-            } catch (e: Exception) { null }
-            if (data != null) currentFrontUrl = data
-        } ?: run { currentFrontUrl = placeholderSvgBase64("Anverso") }
+        currentFrontUrl = processUri(frontUri) ?: placeholderSvgBase64("Anverso")
     }
 
     LaunchedEffect(backUri) {
-        backUri?.let { u ->
-            val data = try {
-                context.contentResolver.openInputStream(u.toUri())?.use {
-                    "data:image/jpeg;base64," + Base64.encodeToString(it.readBytes(), Base64.NO_WRAP)
-                }
-            } catch (e: Exception) { null }
-            if (data != null) currentBackUrl = data
-        } ?: run { currentBackUrl = placeholderSvgBase64("Reverso") }
+        currentBackUrl = processUri(backUri) ?: placeholderSvgBase64("Reverso")
     }
 
     val html = remember(currentFrontUrl, currentBackUrl) {
         """
-        <!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/><style>html,body { margin:0; height:100%; background:transparent; overflow:hidden; } #root { position:fixed; inset:0; } canvas { width:100%; height:100%; display:block; touch-action: none; }</style><script src="three/three.min.js"></script></head><body><div id="root"></div><script>
+        <!doctype html><html><head><meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+        <style>html,body { margin:0; height:100%; background:transparent; overflow:hidden; } #root { position:fixed; inset:0; } canvas { width:100%; height:100%; display:block; touch-action: none; }</style>
+        <script src="three/three.min.js"></script></head>
+        <body><div id="root"></div><script>
             const aspect = $ID_CARD_ASPECT_RATIO;
             const w = aspect, h = 1, d = 0.015, r = 0.07;
             
@@ -138,13 +143,7 @@ fun Rotating3DCard(
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('root').appendChild(renderer.domElement);
-            scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.4); dirLight.position.set(5,5,5); scene.add(dirLight);
-
-            const loader = new THREE.TextureLoader();
-            const frontTex = loader.load("$currentFrontUrl");
-            const backTex = loader.load("$currentBackUrl");
-            frontTex.colorSpace = backTex.colorSpace = THREE.SRGBColorSpace;
+            scene.add(new THREE.AmbientLight(0xffffff, 1.0));
 
             const shape = new THREE.Shape();
             shape.moveTo(-w/2 + r, -h/2);
@@ -157,32 +156,44 @@ fun Rotating3DCard(
             shape.lineTo(-w/2, -h/2 + r);
             shape.quadraticCurveTo(-w/2, -h/2, -w/2 + r, -h/2);
 
-            function createCap(tex, z, isBack = false) {
-                const geom = new THREE.ShapeGeometry(shape);
-                const pos = geom.attributes.position;
-                const uvs = new Float32Array(pos.count * 2);
-                for (let i = 0; i < pos.count; i++) {
-                    let u = (pos.getX(i) + w/2) / w;
-                    let v = (pos.getY(i) + h/2) / h;
-                    if (isBack) u = 1.0 - u;
-                    uvs[i*2] = u; uvs[i*2+1] = v;
-                }
-                geom.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-                const mesh = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
-                mesh.position.z = z;
-                if (isBack) mesh.rotation.y = Math.PI;
-                return mesh;
-            }
-
-            const frontMesh = createCap(frontTex, d/2);
-            const backMesh = createCap(backTex, -d/2, true);
-
-            const edgeGeom = new THREE.ExtrudeGeometry(shape, { depth: d, bevelEnabled: false });
-            edgeGeom.center();
-            const edgeMesh = new THREE.Mesh(edgeGeom, new THREE.MeshStandardMaterial({ color: 0xeeeeee }));
-            if(edgeGeom.groups.length > 0) edgeGeom.groups[0].materialIndex = 0;
+            const loader = new THREE.TextureLoader();
+            const frontTex = loader.load("$currentFrontUrl");
+            const backTex = loader.load("$currentBackUrl");
+            frontTex.colorSpace = backTex.colorSpace = THREE.SRGBColorSpace;
 
             const card = new THREE.Group();
+            
+            // Cara Frontal
+            const frontGeom = new THREE.ShapeGeometry(shape);
+            const fUvs = new Float32Array(frontGeom.attributes.position.count * 2);
+            const fPos = frontGeom.attributes.position;
+            for(let i=0; i<fPos.count; i++) {
+                fUvs[i*2] = (fPos.getX(i) + w/2) / w;
+                fUvs[i*2+1] = (fPos.getY(i) + h/2) / h;
+            }
+            frontGeom.setAttribute('uv', new THREE.BufferAttribute(fUvs, 2));
+            const frontMesh = new THREE.Mesh(frontGeom, new THREE.MeshBasicMaterial({ map: frontTex, transparent: true }));
+            frontMesh.position.z = d/2 + 0.005; // Offset para evitar parpadeo
+            
+            // Cara Trasera (Corregida manual)
+            const backGeom = new THREE.ShapeGeometry(shape);
+            const bUvs = new Float32Array(backGeom.attributes.position.count * 2);
+            const bPos = backGeom.attributes.position;
+            for(let i=0; i<bPos.count; i++) {
+                // Invertimos el eje U (X) para que al girar 180deg se vea bien
+                bUvs[i*2] = 1.0 - ((bPos.getX(i) + w/2) / w);
+                bUvs[i*2+1] = (bPos.getY(i) + h/2) / h;
+            }
+            backGeom.setAttribute('uv', new THREE.BufferAttribute(bUvs, 2));
+            const backMesh = new THREE.Mesh(backGeom, new THREE.MeshBasicMaterial({ map: backTex, transparent: true }));
+            backMesh.position.z = -(d/2 + 0.005);
+            backMesh.rotation.y = Math.PI;
+
+            // Borde
+            const edgeGeom = new THREE.ExtrudeGeometry(shape, { depth: d, bevelEnabled: false });
+            edgeGeom.center();
+            const edgeMesh = new THREE.Mesh(edgeGeom, new THREE.MeshBasicMaterial({ color: 0xeeeeee }));
+
             card.add(frontMesh, backMesh, edgeMesh);
             scene.add(card);
 
