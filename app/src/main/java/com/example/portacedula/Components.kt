@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.net.toUri
 import coil.compose.AsyncImage
 import java.io.ByteArrayOutputStream
 import kotlin.math.roundToInt
@@ -104,25 +105,27 @@ fun Rotating3DCard(
     var currentFrontUrl by remember { mutableStateOf(placeholderSvgBase64("Anverso")) }
     var currentBackUrl by remember { mutableStateOf(placeholderSvgBase64("Reverso")) }
 
-    fun processUri(uriStr: String?): String? {
+    // Función para procesar y optimizar imágenes
+    fun processImage(uriStr: String?): String? {
         if (uriStr == null) return null
         return try {
-            context.contentResolver.openInputStream(Uri.parse(uriStr))?.use { input ->
-                val bitmap = BitmapFactory.decodeStream(input)
+            context.contentResolver.openInputStream(uriStr.toUri())?.use { input ->
+                val options = BitmapFactory.Options().apply { inSampleSize = 2 }
+                val bitmap = BitmapFactory.decodeStream(input, null, options)
                 val out = ByteArrayOutputStream()
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 60, out)
-                bitmap.recycle()
+                bitmap?.compress(Bitmap.CompressFormat.JPEG, 60, out)
+                bitmap?.recycle()
                 "data:image/jpeg;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
             }
         } catch (e: Exception) { null }
     }
 
     LaunchedEffect(frontUri) {
-        currentFrontUrl = processUri(frontUri) ?: placeholderSvgBase64("Anverso")
+        currentFrontUrl = processImage(frontUri) ?: placeholderSvgBase64("Anverso")
     }
 
     LaunchedEffect(backUri) {
-        currentBackUrl = processUri(backUri) ?: placeholderSvgBase64("Reverso")
+        currentBackUrl = processImage(backUri) ?: placeholderSvgBase64("Reverso")
     }
 
     val html = remember(currentFrontUrl, currentBackUrl) {
@@ -148,53 +151,44 @@ fun Rotating3DCard(
             const shape = new THREE.Shape();
             shape.moveTo(-w/2 + r, -h/2);
             shape.lineTo(w/2 - r, -h/2);
-            shape.quadraticCurveTo(w/2, -h/2, w/2, -h/2 + r);
+            shape.absarc(w/2 - r, -h/2 + r, r, -Math.PI/2, 0, false);
             shape.lineTo(w/2, h/2 - r);
-            shape.quadraticCurveTo(w/2, h/2, w/2 - r, h/2);
+            shape.absarc(w/2 - r, h/2 - r, r, 0, Math.PI/2, false);
             shape.lineTo(-w/2 + r, h/2);
-            shape.quadraticCurveTo(-w/2, h/2, -w/2, h/2 - r);
+            shape.absarc(-w/2 + r, h/2 - r, r, Math.PI/2, Math.PI, false);
             shape.lineTo(-w/2, -h/2 + r);
-            shape.quadraticCurveTo(-w/2, -h/2, -w/2 + r, -h/2);
+            shape.absarc(-w/2 + r, -h/2 + r, r, Math.PI, Math.PI * 1.5, false);
 
             const loader = new THREE.TextureLoader();
-            const frontTex = loader.load("$currentFrontUrl");
-            const backTex = loader.load("$currentBackUrl");
-            frontTex.colorSpace = backTex.colorSpace = THREE.SRGBColorSpace;
+            const fTex = loader.load("$currentFrontUrl");
+            const bTex = loader.load("$currentBackUrl");
+            fTex.colorSpace = bTex.colorSpace = THREE.SRGBColorSpace;
+
+            function createCap(tex, z, isBack = false) {
+                const geom = new THREE.ShapeGeometry(shape);
+                const pos = geom.attributes.position;
+                const uvs = new Float32Array(pos.count * 2);
+                for (let i = 0; i < pos.count; i++) {
+                    let u = (pos.getX(i) + w/2) / w;
+                    let v = (pos.getY(i) + h/2) / h;
+                    uvs[i*2] = u; uvs[i*2+1] = v;
+                }
+                geom.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+                const mesh = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+                mesh.position.z = z;
+                if (isBack) mesh.rotation.y = Math.PI;
+                return mesh;
+            }
 
             const card = new THREE.Group();
-            
-            // Cara Frontal
-            const frontGeom = new THREE.ShapeGeometry(shape);
-            const fUvs = new Float32Array(frontGeom.attributes.position.count * 2);
-            const fPos = frontGeom.attributes.position;
-            for(let i=0; i<fPos.count; i++) {
-                fUvs[i*2] = (fPos.getX(i) + w/2) / w;
-                fUvs[i*2+1] = (fPos.getY(i) + h/2) / h;
-            }
-            frontGeom.setAttribute('uv', new THREE.BufferAttribute(fUvs, 2));
-            const frontMesh = new THREE.Mesh(frontGeom, new THREE.MeshBasicMaterial({ map: frontTex, transparent: true }));
-            frontMesh.position.z = d/2 + 0.005; // Offset para evitar parpadeo
-            
-            // Cara Trasera (Corregida manual)
-            const backGeom = new THREE.ShapeGeometry(shape);
-            const bUvs = new Float32Array(backGeom.attributes.position.count * 2);
-            const bPos = backGeom.attributes.position;
-            for(let i=0; i<bPos.count; i++) {
-                // Invertimos el eje U (X) para que al girar 180deg se vea bien
-                bUvs[i*2] = 1.0 - ((bPos.getX(i) + w/2) / w);
-                bUvs[i*2+1] = (bPos.getY(i) + h/2) / h;
-            }
-            backGeom.setAttribute('uv', new THREE.BufferAttribute(bUvs, 2));
-            const backMesh = new THREE.Mesh(backGeom, new THREE.MeshBasicMaterial({ map: backTex, transparent: true }));
-            backMesh.position.z = -(d/2 + 0.005);
-            backMesh.rotation.y = Math.PI;
+            card.add(createCap(fTex, d/2 + 0.005));
+            card.add(createCap(bTex, -d/2 - 0.005, true));
 
-            // Borde
             const edgeGeom = new THREE.ExtrudeGeometry(shape, { depth: d, bevelEnabled: false });
             edgeGeom.center();
             const edgeMesh = new THREE.Mesh(edgeGeom, new THREE.MeshBasicMaterial({ color: 0xeeeeee }));
+            card.add(edgeMesh);
 
-            card.add(frontMesh, backMesh, edgeMesh);
             scene.add(card);
 
             let isDragging = false, startX = 0, yaw = 0, autoSpin = 0.005;
@@ -230,7 +224,7 @@ fun Rotating3DCard(
                 setOnTouchListener { v, ev -> 
                     when (ev.actionMasked) { 
                         MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> v.parent?.requestDisallowInterceptTouchEvent(true)
-                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.parent?.requestDisallowInterceptTouchEvent(false)
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> v.parent?.requestDisallowInterceptTouchEvent(false) 
                     }
                     false 
                 }
