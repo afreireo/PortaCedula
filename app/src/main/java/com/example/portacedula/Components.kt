@@ -249,10 +249,9 @@ private fun placeholderSvgBase64(text: String): String {
 
 @Composable
 fun FullscreenImageViewer(uri: String, onClose: () -> Unit) {
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
-    
+    val scale = remember { Animatable(1f) }
+    val offsetX = remember { Animatable(0f) }
+    val offsetY = remember { Animatable(0f) }
     val swipeOffsetY = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
 
@@ -262,22 +261,10 @@ fun FullscreenImageViewer(uri: String, onClose: () -> Unit) {
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
-        val currentSwipeOffset = swipeOffsetY.value
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = (1f - (currentSwipeOffset / 600f)).coerceIn(0f, 1f)))
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onDoubleTap = {
-                            if (scale > 1f) {
-                                scale = 1f; offsetX = 0f; offsetY = 0f
-                            } else {
-                                scale = 3f
-                            }
-                        }
-                    )
-                }
+                .background(Color.Black.copy(alpha = (1f - (swipeOffsetY.value / 600f)).coerceIn(0f, 1f)))
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false)
@@ -289,28 +276,35 @@ fun FullscreenImageViewer(uri: String, onClose: () -> Unit) {
                             val zoom = event.calculateZoom()
                             val pan = event.calculatePan()
 
-                            if (scale > 1f || isMultiTouch) {
-                                // Modo Zoom/Pan activo (se ignoran gestos de cierre)
-                                val newScale = (scale * zoom).coerceIn(1f, 5f)
-                                scale = newScale
-                                offsetX += pan.x
-                                offsetY += pan.y
-                                
-                                if (scale <= 1f) {
-                                    scale = 1f; offsetX = 0f; offsetY = 0f
+                            if (scale.value > 1f || isMultiTouch) {
+                                // Modo Zoom/Pan activo
+                                scope.launch {
+                                    val newScale = (scale.value * zoom).coerceIn(1f, 5f)
+                                    scale.snapTo(newScale)
+                                    offsetX.snapTo(offsetX.value + pan.x)
+                                    offsetY.snapTo(offsetY.value + pan.y)
+                                    
+                                    if (newScale <= 1f) {
+                                        scale.snapTo(1f)
+                                        offsetX.snapTo(0f)
+                                        offsetY.snapTo(0f)
+                                    }
                                 }
-                                
-                                // Si estamos operando el zoom, reseteamos el swipe down
+                                if (zoom != 1f || pan != androidx.compose.ui.geometry.Offset.Zero) {
+                                    event.changes.forEach { it.consume() }
+                                }
                                 if (swipeOffsetY.value != 0f) {
                                     scope.launch { swipeOffsetY.snapTo(0f) }
                                 }
-                            } else if (scale == 1f && !isMultiTouch) {
-                                // Modo Cierre (solo 1 dedo, sin zoom y permitiendo arrastrar la imagen hacia abajo)
+                            } else if (scale.value == 1f && !isMultiTouch) {
+                                // Modo Cierre (arrastrar hacia abajo)
                                 scope.launch {
                                     swipeOffsetY.snapTo((swipeOffsetY.value + pan.y).coerceAtLeast(0f))
                                 }
+                                if (swipeOffsetY.value > 0f) {
+                                    event.changes.forEach { it.consume() }
+                                }
                             }
-                            event.changes.forEach { it.consume() }
                         } while (event.changes.any { it.pressed })
 
                         // Al soltar los dedos
@@ -322,6 +316,21 @@ fun FullscreenImageViewer(uri: String, onClose: () -> Unit) {
                             }
                         }
                     }
+                }
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onDoubleTap = {
+                            scope.launch {
+                                if (scale.value > 1f) {
+                                    launch { scale.animateTo(1f) }
+                                    launch { offsetX.animateTo(0f) }
+                                    launch { offsetY.animateTo(0f) }
+                                } else {
+                                    launch { scale.animateTo(2.5f) }
+                                }
+                            }
+                        }
+                    )
                 },
             contentAlignment = Alignment.Center
         ) {
@@ -331,10 +340,10 @@ fun FullscreenImageViewer(uri: String, onClose: () -> Unit) {
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()
-                    .offset { IntOffset(offsetX.roundToInt(), (offsetY + currentSwipeOffset).roundToInt()) }
+                    .offset { IntOffset(offsetX.value.roundToInt(), (offsetY.value + swipeOffsetY.value).roundToInt()) }
                     .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
+                        scaleX = scale.value
+                        scaleY = scale.value
                     }
             )
 
