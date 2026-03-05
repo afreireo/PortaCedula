@@ -5,25 +5,24 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.*
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -78,15 +77,13 @@ class MainActivity : ComponentActivity() {
 fun MainPagerScreen(vm: HomeViewModel) {
     val ui by vm.ui.collectAsState()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     
-    // Configuración del Pager con 3 páginas (Inicio, Tarjetas, Ajustes)
     val pagerState = rememberPagerState(pageCount = { 3 })
+    var showNameDialog by remember { mutableStateOf(false) }
 
-    // Determinamos si hay overlays activos (Zoom, Selección, etc) que deban cerrarse primero
     val isOverlayActive = ui.isAddingNewCard || ui.selectedCards.isNotEmpty() || ui.selectedPart != null || ui.showZoom != null
     
-    // NAVEGACIÓN INTELIGENTE DEL BOTÓN ATRÁS:
-    // Siempre volvemos a la pestaña 0 (Inicio) desde la 1 o 2 si no hay nada abierto.
     BackHandler(enabled = pagerState.currentPage != 0 && !isOverlayActive) {
         scope.launch { 
             pagerState.animateScrollToPage(0) 
@@ -122,6 +119,34 @@ fun MainPagerScreen(vm: HomeViewModel) {
                     }
                 }
             }
+        },
+        floatingActionButton = {
+            val currentPage = pagerState.currentPage
+            val showFab = !ui.isAddingNewCard && when (currentPage) {
+                0 -> ui.favoriteCard != null && ui.selectedPart == null
+                1 -> ui.selectedCards.isEmpty()
+                else -> false
+            }
+            
+            AnimatedVisibility(
+                visible = showFab,
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut()
+            ) {
+                FloatingActionButton(
+                    onClick = {
+                        when (currentPage) {
+                            0 -> ui.favoriteCard?.let { PdfGenerator.generateAndShare(context, it) }
+                            1 -> showNameDialog = true
+                        }
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    val icon = if (currentPage == 0) Icons.Default.Share else Icons.Default.Add
+                    Icon(icon, contentDescription = null)
+                }
+            }
         }
     ) { innerPadding ->
         HorizontalPager(
@@ -131,7 +156,6 @@ fun MainPagerScreen(vm: HomeViewModel) {
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding),
             userScrollEnabled = !isOverlayActive,
-            // CLAVE: Mantener todas las páginas vivas para que la tarjeta 3D no se destruya
             beyondViewportPageCount = 2
         ) { pageIndex ->
             when (pageIndex) {
@@ -140,5 +164,33 @@ fun MainPagerScreen(vm: HomeViewModel) {
                 2 -> SettingsScreen(vm)
             }
         }
+    }
+
+    if (showNameDialog) {
+        var name by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showNameDialog = false },
+            title = { Text("Nueva Tarjeta") },
+            text = {
+                TextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Nombre de la tarjeta") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (name.isNotBlank()) {
+                        vm.startAddingCard()
+                        vm.updateDraftName(name)
+                        showNameDialog = false
+                    }
+                }) { Text("Siguiente") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNameDialog = false }) { Text("Cancelar") }
+            }
+        )
     }
 }

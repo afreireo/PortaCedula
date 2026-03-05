@@ -2,7 +2,6 @@ package com.example.portacedula
 
 import android.app.Activity
 import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
@@ -47,9 +46,7 @@ import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 @Composable
 fun CardsScreen(vm: HomeViewModel) {
     val ui by vm.ui.collectAsState()
-    val context = LocalContext.current
     var viewingCard by remember { mutableStateOf<IdCard?>(null) }
-    var showNameDialog by remember { mutableStateOf(false) }
     
     BackHandler(enabled = ui.selectedCards.isNotEmpty() || ui.isAddingNewCard) {
         if (ui.selectedCards.isNotEmpty()) {
@@ -106,13 +103,6 @@ fun CardsScreen(vm: HomeViewModel) {
                     }
                 }
             )
-        },
-        floatingActionButton = {
-            if (ui.selectedCards.isEmpty()) {
-                FloatingActionButton(onClick = { showNameDialog = true }) {
-                    Icon(Icons.Default.Add, contentDescription = "Añadir")
-                }
-            }
         }
     ) { pad ->
         val contentModifier = Modifier
@@ -153,34 +143,6 @@ fun CardsScreen(vm: HomeViewModel) {
                 }
             }
         }
-    }
-
-    if (showNameDialog) {
-        var name by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { showNameDialog = false },
-            title = { Text("Nueva Tarjeta") },
-            text = {
-                TextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Nombre de la tarjeta") },
-                    singleLine = true
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (name.isNotBlank()) {
-                        vm.startAddingCard()
-                        vm.updateDraftName(name)
-                        showNameDialog = false
-                    }
-                }) { Text("Siguiente") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showNameDialog = false }) { Text("Cancelar") }
-            }
-        )
     }
 
     if (viewingCard != null) {

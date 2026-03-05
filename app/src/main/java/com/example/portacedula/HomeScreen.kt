@@ -137,17 +137,6 @@ fun HomeScreen(vm: HomeViewModel) {
                     }
                 }
             )
-        },
-        floatingActionButton = {
-            if (card != null && ui.selectedPart == null) {
-                FloatingActionButton(
-                    onClick = { PdfGenerator.generateAndShare(context, card) },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                ) {
-                    Icon(Icons.Default.Share, contentDescription = "Compartir")
-                }
-            }
         }
     ) { pad ->
         Box(Modifier.fillMaxSize()) {
