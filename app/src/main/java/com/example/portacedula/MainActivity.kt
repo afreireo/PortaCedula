@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -48,7 +49,13 @@ class MainActivity : ComponentActivity() {
             
             val ui by vm.ui.collectAsState()
 
-            PortaCedulaTheme(darkTheme = ui.isDarkMode) {
+            val darkTheme = when (ui.themeMode) {
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            }
+
+            PortaCedulaTheme(darkTheme = darkTheme) {
                 val navController = rememberNavController()
 
                 // Visor de Zoom GLOBAL

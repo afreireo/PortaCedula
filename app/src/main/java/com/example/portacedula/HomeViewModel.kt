@@ -14,7 +14,7 @@ data class HomeUiState(
     val cards: List<IdCard> = emptyList(),
     val favoriteCard: IdCard? = null,
     val showZoom: String? = null,
-    val isDarkMode: Boolean = false,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
     
     // Estados para edición/selección en Home
     val selectedPart: CardPart? = null,
@@ -38,6 +38,11 @@ class HomeViewModel(private val repo: IdCardRepository) : ViewModel() {
                     cards = cardsList,
                     favoriteCard = (cardsList.find { card -> card.isFavorite } ?: cardsList.firstOrNull())
                 ) }
+            }
+        }
+        viewModelScope.launch {
+            repo.themeFlow.collect { mode ->
+                _ui.update { it.copy(themeMode = mode) }
             }
         }
     }
@@ -127,5 +132,8 @@ class HomeViewModel(private val repo: IdCardRepository) : ViewModel() {
     fun clearCardSelection() = _ui.update { it.copy(selectedCards = emptySet()) }
 
     fun onZoom(uri: String?) = _ui.update { it.copy(showZoom = uri) }
-    fun toggleDarkMode(enabled: Boolean) = _ui.update { it.copy(isDarkMode = enabled) }
+    
+    fun setThemeMode(mode: ThemeMode) = viewModelScope.launch {
+        repo.setThemeMode(mode)
+    }
 }

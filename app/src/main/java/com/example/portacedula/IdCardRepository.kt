@@ -12,6 +12,7 @@ private val Context.dataStore by preferencesDataStore("idcard_prefs")
 
 class IdCardRepository(private val context: Context) {
     private val KEY_CARDS = stringPreferencesKey("cards_list")
+    private val KEY_THEME = stringPreferencesKey("theme_mode")
 
     val cardsFlow = context.dataStore.data.map { p ->
         val json = p[KEY_CARDS] ?: "[]"
@@ -19,6 +20,15 @@ class IdCardRepository(private val context: Context) {
             Json.decodeFromString<List<IdCard>>(json)
         } catch (e: Exception) {
             emptyList()
+        }
+    }
+
+    val themeFlow = context.dataStore.data.map { p ->
+        val modeStr = p[KEY_THEME] ?: ThemeMode.SYSTEM.name
+        try {
+            ThemeMode.valueOf(modeStr)
+        } catch (e: Exception) {
+            ThemeMode.SYSTEM
         }
     }
 
@@ -32,5 +42,9 @@ class IdCardRepository(private val context: Context) {
             current.add(card)
             p[KEY_CARDS] = Json.encodeToString(current)
         }
+    }
+
+    suspend fun setThemeMode(mode: ThemeMode) {
+        context.dataStore.edit { it[KEY_THEME] = mode.name }
     }
 }

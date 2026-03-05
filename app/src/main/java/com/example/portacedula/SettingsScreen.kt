@@ -1,5 +1,6 @@
 package com.example.portacedula
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Coffee
@@ -32,15 +33,23 @@ fun SettingsScreen(vm: HomeViewModel) {
         ) {
             Text("Apariencia", style = MaterialTheme.typography.titleMedium)
             
-            ListItem(
-                headlineContent = { Text("Modo Oscuro") },
-                trailingContent = {
-                    Switch(
-                        checked = ui.isDarkMode,
-                        onCheckedChange = { vm.toggleDarkMode(it) }
-                    )
-                }
-            )
+            Column {
+                ThemeOptionItem(
+                    title = "Seguir sistema",
+                    selected = ui.themeMode == ThemeMode.SYSTEM,
+                    onClick = { vm.setThemeMode(ThemeMode.SYSTEM) }
+                )
+                ThemeOptionItem(
+                    title = "Modo Claro",
+                    selected = ui.themeMode == ThemeMode.LIGHT,
+                    onClick = { vm.setThemeMode(ThemeMode.LIGHT) }
+                )
+                ThemeOptionItem(
+                    title = "Modo Oscuro",
+                    selected = ui.themeMode == ThemeMode.DARK,
+                    onClick = { vm.setThemeMode(ThemeMode.DARK) }
+                )
+            }
 
             HorizontalDivider()
 
@@ -68,4 +77,15 @@ fun SettingsScreen(vm: HomeViewModel) {
             }
         }
     }
+}
+
+@Composable
+fun ThemeOptionItem(title: String, selected: Boolean, onClick: () -> Unit) {
+    ListItem(
+        modifier = Modifier.clickable { onClick() },
+        headlineContent = { Text(title) },
+        trailingContent = {
+            RadioButton(selected = selected, onClick = null)
+        }
+    )
 }
