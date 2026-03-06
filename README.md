@@ -29,7 +29,7 @@ Aplicación para gestionar y portar una copia digital de documentos de identidad
 
 ### Función de exportación a PDF
 <img width="300" alt="3pdf" src="https://github.com/user-attachments/assets/45ffc712-d22d-4a29-be72-6c1ebc83ea20" />
-<img width="300" alt="4pdf" src="https://github.com/user-attachments/assets/63382d84-c249-4030-b056-d89a02f5ee82" />
+<img width="340" alt="4pdf" src="https://github.com/user-attachments/assets/63382d84-c249-4030-b056-d89a02f5ee82" />
 
 
 ## Requisitos
