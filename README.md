@@ -20,7 +20,7 @@ Aplicación para gestionar y portar una copia digital de documentos de identidad
 ### Pantalla de inicio con tarjeta 3D
 <!-- Colocar captura de la pantalla principal con el modelo 3D aquí -->
 <img src="URL_CAPTURA_HOME_3D" alt="Inicio 3D" width="300"/>
-<img width="1080" height="1440" alt="1home" src="https://github.com/user-attachments/assets/20bfe0b1-ac6e-4288-8ca7-4d6bca4e43c7" />
+<img width="300" alt="1home" src="https://github.com/user-attachments/assets/20bfe0b1-ac6e-4288-8ca7-4d6bca4e43c7" />
 
 ### Escáner automático de documentos
 <!-- Colocar captura de la interfaz de escaneo aquí -->
